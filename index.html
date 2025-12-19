@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>コピペかんぺ｜ 万能スニペット管理</title>
+    <meta name="description" content="AIプロンプト、SNSタグ、頻出フレーズを1タップでコピー。NomuToolsがおくる、ログイン不要の爆速コピペパレット。">
+
+    <link rel="icon" type="image/png" href="images/favicon.png">
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+
+    <style>
+        .drag-ghost {
+            opacity: 0.4;
+            background: #e2e8f0;
+        }
+
+        textarea {
+            overflow: hidden;
+            transition: height 0.1s ease;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .row-animate {
+            animation: fadeIn 0.3s ease-out forwards;
+        }
+    </style>
+</head>
+
+<body class="bg-slate-50 min-h-screen p-4 md:p-8 font-sans text-slate-900 selection:bg-blue-100">
+
+    <div id="app" class="max-w-2xl mx-auto">
+        <header class="mb-10 text-center">
+            <a href="#" class="inline-flex flex-col items-center group">
+                <h1
+                    class="text-3xl font-extrabold text-slate-800 flex items-center gap-3 group-hover:text-blue-600 transition-colors">
+                    <i data-lucide="zap" class="text-yellow-500 fill-yellow-500"></i> コピペかんぺ
+                </h1>
+                <p class="mt-2 text-slate-400 text-sm font-medium tracking-wide">
+                    INSTANT SNIPPET PALETTE
+                </p>
+            </a>
+        </header>
+
+        <div class="flex justify-between mb-6 gap-3">
+            <button onclick="addRow()"
+                class="flex-[2] bg-blue-600 hover:bg-blue-700 text-white font-semibold py-4 px-6 rounded-2xl shadow-lg shadow-blue-200 flex items-center justify-center gap-2 transition-all active:scale-95">
+                <i data-lucide="plus-circle" size="22"></i> 行を追加
+            </button>
+            <button onclick="clearAll()"
+                class="flex-1 bg-white hover:bg-slate-50 text-slate-400 font-semibold py-4 px-6 border border-slate-200 rounded-2xl flex items-center justify-center gap-2 transition-all active:scale-95 text-sm">
+                <i data-lucide="trash-2" size="18"></i> 全消去
+            </button>
+        </div>
+
+        <div id="snippet-container" class="space-y-4 min-h-[100px]"></div>
+
+        <footer class="mt-24 border-t border-slate-200 pt-12 pb-16 text-slate-500 text-[11px] leading-relaxed">
+
+            <div class="flex flex-col items-center mb-12">
+                <a href="#" class="group flex flex-col items-center transition-transform hover:-translate-y-1">
+                    <div class="flex items-center gap-3 mb-4">
+                        <img src="images/favicon.png" alt="NomuTools Logo"
+                            class="w-8 h-8 rounded-lg shadow-sm grayscale group-hover:grayscale-0 transition-all duration-500">
+                        <div class="text-left">
+                            <span
+                                class="block text-slate-800 font-bold text-sm tracking-tighter group-hover:text-blue-600 transition-colors">NomuTools</span>
+                            <span class="block text-slate-400 text-[10px]">Simple & Lightweight Utilities.</span>
+                        </div>
+                    </div>
+                    <p class="text-center max-w-sm opacity-70 group-hover:opacity-100 transition-opacity">
+                        「削ぎ落とした、最高の使い心地を」<br>
+                        NomuToolsは、日々のデジタル作業をほんの少し速くする、ミニマルなツール群を展開しています。
+                    </p>
+                </a>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8 text-left border-t border-slate-100 pt-8">
+                <div>
+                    <h2 class="font-bold text-slate-700 mb-2 font-bold italic tracking-wider">Security</h2>
+                    <p class="text-red-400 font-bold mb-2">個人情報や暗証番号は絶対に入力しないでください。</p>
+                    <p>データはブラウザ（LocalStorage）にのみ保存され、サーバーへ送信されることはありません。管理は自己責任でお願いいたします。</p>
+                </div>
+                <div>
+                    <h2 class="font-bold text-slate-700 mb-2 font-bold italic tracking-wider">Support</h2>
+                    <p>キャッシュ消去等によりデータが消失しても復旧はできません。本ツールの利用により生じた損害について、開発者は一切の責任を負いません。</p>
+                </div>
+            </div>
+
+            <div class="mt-12 text-center opacity-30 tracking-widest uppercase font-light">
+                &copy; 2025 NomuTools
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        let snippets = JSON.parse(localStorage.getItem('kanpe-data')) || [
+            { id: 1, text: 'この文章を、よりプロフェッショナルなトーンに書き直して。' },
+            { id: 2, text: '#AI活用 #生産性向上 #NomuTools' }
+        ];
+
+        function save() {
+            localStorage.setItem('kanpe-data', JSON.stringify(snippets));
+        }
+
+        function autoResize(el) {
+            el.style.height = 'auto';
+            el.style.height = el.scrollHeight + 'px';
+        }
+
+        function render() {
+            const container = document.getElementById('snippet-container');
+            container.innerHTML = '';
+
+            snippets.forEach((s) => {
+                const div = document.createElement('div');
+                div.dataset.id = s.id;
+                // 変更点: items-stretch から items-center に変更
+                div.className = "row-animate flex gap-1 items-center bg-white rounded-2xl shadow-sm border border-slate-200 transition-all hover:border-blue-300 hover:shadow-md";
+                div.innerHTML = `
+                    <div class="drag-handle p-3 text-slate-200 cursor-grab active:cursor-grabbing hover:text-slate-400 transition-colors">
+                        <i data-lucide="grip-vertical" size="20"></i>
+                    </div>
+                    <textarea 
+                        oninput="updateText(${s.id}, this.value); autoResize(this)"
+                        // 変更点: py-3 から py-4 に変更、min-h-[48px] から min-h-[56px] に変更
+                        class="flex-1 p-2 py-4 bg-transparent focus:outline-none resize-y min-h-[56px] text-slate-700 leading-relaxed placeholder:text-slate-300" 
+                        placeholder="テキストを入力..."
+                    >${s.text}</textarea>
+                    <div class="flex flex-col gap-1">
+                        <button onclick="copyText(${s.id}, this)" class="p-3 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all" title="コピー">
+                            <i data-lucide="copy" size="18"></i>
+                        </button>
+                        <button onclick="removeRow(${s.id})" class="p-3 text-slate-200 hover:text-red-400 hover:bg-red-50 rounded-xl transition-all" title="削除">
+                            <i data-lucide="x" size="18"></i>
+                        </button>
+                    </div>
+                `;
+                container.appendChild(div);
+                autoResize(div.querySelector('textarea'));
+            });
+            lucide.createIcons();
+
+            new Sortable(container, {
+                handle: '.drag-handle',
+                animation: 250,
+                ghostClass: 'drag-ghost',
+                onEnd: function () {
+                    const newOrder = Array.from(container.children).map(el => parseInt(el.dataset.id));
+                    snippets = newOrder.map(id => snippets.find(s => s.id === id));
+                    save();
+                }
+            });
+        }
+
+        function addRow() {
+            const newId = Date.now();
+            snippets.push({ id: newId, text: '' });
+            render();
+            save();
+            const textareas = document.querySelectorAll('textarea');
+            textareas[textareas.length - 1].focus();
+        }
+
+        function removeRow(id) {
+            snippets = snippets.filter(s => s.id !== id);
+            render();
+            save();
+        }
+
+        function clearAll() {
+            if (confirm('全てのデータを消去しますか？')) {
+                snippets = [];
+                render();
+                save();
+            }
+        }
+
+        function updateText(id, val) {
+            const target = snippets.find(s => s.id === id);
+            if (target) target.text = val;
+            save();
+        }
+
+        async function copyText(id, btn) {
+            const target = snippets.find(s => s.id === id);
+            if (target) {
+                try {
+                    await navigator.clipboard.writeText(target.text);
+                    const originalInner = btn.innerHTML;
+                    btn.innerHTML = '<i data-lucide="check" class="text-green-500 animate-bounce"></i>';
+                    lucide.createIcons();
+                    setTimeout(() => {
+                        btn.innerHTML = originalInner;
+                        lucide.createIcons();
+                    }, 1000);
+                } catch (err) {
+                    console.error('Copy failed', err);
+                }
+            }
+        }
+
+        render();
+    </script>
+</body>
+
+</html>
