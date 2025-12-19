@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://instant-snippet-palette-nomutools.onrender.com/sitemap.xml
